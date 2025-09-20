@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Optional
+import numpy as np
 
 from .config import RunConfig
 from .logging_utils import get_logger, log_kv
+from .grid.loaders import load_surface_static
+from .physics import build_surface_params
 
 
 def _parse_args() -> argparse.Namespace:
@@ -48,6 +52,30 @@ def main() -> None:
     if not staticdir.exists():
         raise FileNotFoundError(f"Static data dir not found: {staticdir}")
     log_kv(logger, "static_loaded", path=str(staticdir))
+
+    # Determine expected shape from elevation.npy for convenience
+    elev_path = Path(args.staticdir) / "elevation.npy"
+    if not elev_path.exists():
+        raise FileNotFoundError(f"Missing elevation.npy in {args.staticdir}")
+    expect_shape = tuple(np.load(elev_path).shape)
+
+    # Load static maps with shape checks
+    static = load_surface_static(args.staticdir, expect_shape)
+    log_kv(logger, "static_shapes", shape=list(expect_shape))
+
+    # Build per-cell surface parameters from catalog (if provided)
+    catalog = cfg.physics.get("surface_catalog", {}) if cfg else {}
+    if catalog:
+        surf_params = build_surface_params(static.terrain_type, static.mask_water, catalog)
+        # Minimal diagnostic: report a few stats
+        log_kv(
+            logger,
+            "surface_params_built",
+            C_E_min=float(np.min(surf_params.C_E)),
+            C_E_max=float(np.max(surf_params.C_E)),
+        )
+    else:
+        log_kv(logger, "surface_params_skipped", reason="no surface_catalog in YAML")
 
     # Placeholder run
     log_kv(

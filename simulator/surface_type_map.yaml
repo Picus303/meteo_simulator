@@ -1,0 +1,14 @@
+physics:
+  surface_catalog:
+    id_to_class: { "0": "ocean", "1": "ice", "2": "snow", "3": "forest", "4": "grass", "5": "desert", "6": "alpine" }
+    classes:
+      ocean:  { C_E: 1.2e-3, qs_mode: water, qs_scale: 1.0 }
+      ice:    { C_E: 8.0e-4, qs_mode: ice,   qs_scale: 1.0 }
+      snow:   { C_E: 6.0e-4, qs_mode: ice,   qs_scale: 1.0 }
+      forest: { C_E: 7.0e-4, qs_mode: water, qs_scale: 1.0 }
+      grass:  { C_E: 6.0e-4, qs_mode: water, qs_scale: 1.0 }
+      desert: { C_E: 3.0e-4, qs_mode: dry,   qs_scale: 0.3 }
+      alpine: { C_E: 4.0e-4, qs_mode: ice,   qs_scale: 0.8 }
+      land_generic: { C_E: 5.0e-4, qs_mode: water, qs_scale: 1.0 }
+    default_class: land_generic
+    ocean_class: ocean
