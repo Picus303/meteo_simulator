@@ -101,14 +101,17 @@ def enforce_cap_fluxes(FM_u: np.ndarray, FM_v: np.ndarray, grid: Grid) -> tuple[
     """
     Apply polar-cap rules to mass fluxes (or any zonal/meridional fluxes).
 
-    - On cap rows: zonal flux FM_u[j,:] = 0  (circumference → 0)
-    - On north/south cap boundaries: (optional) aggregate meridional fluxes for diagnostics.
+    Shapes:
+      FM_u: (ny, nx+1)  # U faces (zonal)
+      FM_v: (ny+1, nx)  # V faces (meridional)
 
-    Returns (FM_u_new, FM_v_copy). Does not modify FM_v values but keeps API symmetric.
+    - On cap rows: zero the entire U-row (all nx+1 faces), since circumference → 0.
+    - We leave FM_v untouched here; aggregation across the cap boundary is a separate diagnostic.
     """
     Fu = FM_u.copy()
-    rows2d = grid.cap_mask2d
-    Fu[rows2d] = 0.0
+    # Use 1D row mask to avoid shape mismatch (cap_mask2d is (ny,nx))
+    if np.any(grid.cap_rows):
+        Fu[grid.cap_rows, :] = 0.0
     Fv = FM_v.copy()
     return Fu, Fv
 
