@@ -7,7 +7,7 @@ import numpy as np
 from ..core.state import State
 from ..core.tendencies import Tend
 from ..grid.sphere import Grid
-from ..grid.metrics import dx_dy_on_centers
+from ..grid.metrics import dx_dy_on_centers, _dx_dy_faces_from_centers
 
 
 @dataclass
@@ -17,23 +17,12 @@ class PressureConfig:
     cap_zero_u: bool = True
 
 
-def _center_to_u_avg(A: np.ndarray) -> np.ndarray:
-    """Average a (ny,nx) field to U faces (ny,nx+1) by 1/2*(left+right) with periodic i."""
-    return 0.5 * (np.concatenate([A[:, -1:], A], axis=1) + np.concatenate([A, A[:, :1]], axis=1))
 
-
-def _center_to_v_avg(A: np.ndarray) -> np.ndarray:
-    """Average a (ny,nx) field to V faces (ny+1,nx) by 1/2*(south+north) with clamped j."""
-    out = np.empty((A.shape[0] + 1, A.shape[1]), dtype=A.dtype)
-    # Correct explicit construction
-    out[1:-1, :] = 0.5 * (A[:-1, :] + A[1:, :])
-    out[0, :] = A[0, :]
-    out[-1, :] = A[-1, :]
-    return out
 
 
 def _grad_half_g_h2_on_u(M: np.ndarray, dx_u: np.ndarray, *, g: float, rho_ref: float) -> np.ndarray:
-    """Compute ∂x(½ g h²) at U faces using center values of M.
+    """
+    Compute ∂x(½ g h²) at U faces using center values of M.
 
     Returns array (ny,nx+1) aligned with MU.
     """
@@ -47,7 +36,8 @@ def _grad_half_g_h2_on_u(M: np.ndarray, dx_u: np.ndarray, *, g: float, rho_ref: 
 
 
 def _grad_half_g_h2_on_v(M: np.ndarray, dy_v: np.ndarray, *, g: float, rho_ref: float) -> np.ndarray:
-    """Compute ∂y(½ g h²) at V faces using center values of M.
+    """
+    Compute ∂y(½ g h²) at V faces using center values of M.
 
     Returns array (ny+1,nx) aligned with MV. We clamp gradients at j=0, ny to zero for simplicity.
     """
@@ -63,21 +53,6 @@ def _grad_half_g_h2_on_v(M: np.ndarray, dy_v: np.ndarray, *, g: float, rho_ref: 
     grad[0, :] = 0.0
     grad[-1, :] = 0.0
     return factor * grad
-
-
-def _dx_dy_faces_from_centers(grid: Grid) -> tuple[np.ndarray, np.ndarray]:
-    """Build face distances from center distances by simple averaging.
-
-    dx_u: (ny,nx+1) from dx_centers (ny,nx) averaged to U faces (periodic in i)
-    dy_v: (ny+1,nx) from dy_centers (ny,nx) averaged to V faces (clamped in j)
-    """
-    dx_c, dy_c = dx_dy_on_centers(grid)  # both (ny,nx)
-    dx_u = _center_to_u_avg(dx_c)
-    dy_v = np.empty((grid.ny + 1, grid.nx), dtype=dy_c.dtype)
-    dy_v[1:-1, :] = 0.5 * (dy_c[:-1, :] + dy_c[1:, :])
-    dy_v[0, :] = dy_c[0, :]
-    dy_v[-1, :] = dy_c[-1, :]
-    return dx_u, dy_v
 
 
 def pressure_tendencies(state: State, grid: Grid, cfg: PressureConfig = PressureConfig()) -> Tend:

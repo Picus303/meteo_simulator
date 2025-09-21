@@ -7,8 +7,8 @@ from .sphere import Grid
 
 
 def cell_areas(grid: Grid) -> np.ndarray:
-    """Cell areas A[j,i] = R^2 (sin φ_{j+1/2} - sin φ_{j-1/2}) Δλ.
-
+    """
+    Cell areas A[j,i] = R^2 (sin φ_{j+1/2} - sin φ_{j-1/2}) Δλ.
     Returns (ny,nx) array.
     """
     R = grid.R
@@ -23,8 +23,8 @@ def cell_areas(grid: Grid) -> np.ndarray:
 
 
 def dx_dy_on_centers(grid: Grid) -> Tuple[np.ndarray, np.ndarray]:
-    """Return metric lengths Δx, Δy at cell centers (ny,nx).
-
+    """
+    Return metric lengths Δx, Δy at cell centers (ny,nx).
     Δx = R cos φ Δλ,  Δy = R Δφ.
     """
     R = grid.R
@@ -65,6 +65,57 @@ def coriolis_on_stag(grid: Grid, omega: float) -> Dict[str, np.ndarray]:
     fU = 2.0 * omega * np.sin(grid.latu2d)
     fV = 2.0 * omega * np.sin(grid.latv2d)
     return {"fC": fC, "fU": fU, "fV": fV}
+
+
+def _dual_areas(grid: Grid) -> tuple[np.ndarray, np.ndarray]:
+	"""
+	Dual control-volume areas for U and V faces.
+
+	Au: (ny, nx+1) average of left/right cell areas
+	Av: (ny+1, nx) average of south/north cell areas (clamped at poles)
+	"""
+	A = cell_areas(grid)
+	# U faces: average of neighboring centers in i (periodic)
+	A_left  = np.concatenate([A[:, -1:], A], axis=1)
+	A_right = np.concatenate([A, A[:, :1]], axis=1)
+	Au = 0.5 * (A_left + A_right)
+	# V faces: average of neighboring centers in j (clamped at poles)
+	Av = np.empty((grid.ny + 1, grid.nx), dtype=A.dtype)
+	Av[1:-1, :] = 0.5 * (A[:-1, :] + A[1:, :])
+	Av[0, :] = A[0, :]
+	Av[-1, :] = A[-1, :]
+	return Au, Av
+
+
+def _center_to_u_avg(A: np.ndarray) -> np.ndarray:
+    """Average a (ny,nx) field to U faces (ny,nx+1) by 1/2*(left+right) with periodic i."""
+    return 0.5 * (np.concatenate([A[:, -1:], A], axis=1) + np.concatenate([A, A[:, :1]], axis=1))
+
+
+def _center_to_v_avg(A: np.ndarray) -> np.ndarray:
+    """Average a (ny,nx) field to V faces (ny+1,nx) by 1/2*(south+north) with clamped j."""
+    out = np.empty((A.shape[0] + 1, A.shape[1]), dtype=A.dtype)
+    # Correct explicit construction
+    out[1:-1, :] = 0.5 * (A[:-1, :] + A[1:, :])
+    out[0, :] = A[0, :]
+    out[-1, :] = A[-1, :]
+    return out
+
+
+def _dx_dy_faces_from_centers(grid: Grid) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Build face distances from center distances by simple averaging.
+
+    dx_u: (ny,nx+1) from dx_centers (ny,nx) averaged to U faces (periodic in i)
+    dy_v: (ny+1,nx) from dy_centers (ny,nx) averaged to V faces (clamped in j)
+    """
+    dx_c, dy_c = dx_dy_on_centers(grid)  # both (ny,nx)
+    dx_u = _center_to_u_avg(dx_c)
+    dy_v = np.empty((grid.ny + 1, grid.nx), dtype=dy_c.dtype)
+    dy_v[1:-1, :] = 0.5 * (dy_c[:-1, :] + dy_c[1:, :])
+    dy_v[0, :] = dy_c[0, :]
+    dy_v[-1, :] = dy_c[-1, :]
+    return dx_u, dy_v
 
 
 # ── Polar-cap helpers ────────────────────────────────────────────────────────

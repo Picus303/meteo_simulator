@@ -8,9 +8,9 @@ import numpy as np
 from ..core.state import State
 from ..core.tendencies import Tend
 from ..grid.sphere import Grid
-from ..grid.metrics import cell_areas
+from ..grid.metrics import _dual_areas
 from ..grid.staggering import to_u_centered, to_v_centered
-from .fluxform import mass_fluxes, _divergence
+from .fluxform import mass_fluxes
 
 
 @dataclass
@@ -61,26 +61,6 @@ def _v_on_U(v: np.ndarray) -> np.ndarray:
 	return out
 
 
-def _dual_areas(grid: Grid) -> tuple[np.ndarray, np.ndarray]:
-	"""
-	Dual control-volume areas for U and V faces.
-
-	Au: (ny, nx+1) average of left/right cell areas
-	Av: (ny+1, nx) average of south/north cell areas (clamped at poles)
-	"""
-	A = cell_areas(grid)
-	# U faces: average of neighboring centers in i (periodic)
-	A_left  = np.concatenate([A[:, -1:], A], axis=1)
-	A_right = np.concatenate([A, A[:, :1]], axis=1)
-	Au = 0.5 * (A_left + A_right)
-	# V faces: average of neighboring centers in j (clamped at poles)
-	Av = np.empty((grid.ny + 1, grid.nx), dtype=A.dtype)
-	Av[1:-1, :] = 0.5 * (A[:-1, :] + A[1:, :])
-	Av[0, :] = A[0, :]
-	Av[-1, :] = A[-1, :]
-	return Au, Av
-
-
 def advect_momentum(state: State, grid: Grid, cfg: MomAdvConfig = MomAdvConfig()) -> Tend:
 	"""Return tendencies for MU,MV due to advection by mass fluxes on U/V control volumes.
 
@@ -97,7 +77,7 @@ def advect_momentum(state: State, grid: Grid, cfg: MomAdvConfig = MomAdvConfig()
 	Fu, Fv = mass_fluxes(state, grid)
 
 	# Face velocities and dual areas
-	u, v, _M_u, _M_v = _velocities_on_faces(state, eps)
+	u, v, _, _ = _velocities_on_faces(state, eps)
 	Au, Av = _dual_areas(grid)
 
 	# ── U component (on U control volumes)
