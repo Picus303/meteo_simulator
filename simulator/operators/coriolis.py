@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 import numpy as np
 
 from ..core.state import State
+from ..core.steppers import PostHook
 from ..grid.sphere import Grid
 from ..grid.staggering import to_u_centered, to_v_centered
 
@@ -65,7 +67,7 @@ def _reconstruct_v_faces_from_centers(v_c: np.ndarray) -> np.ndarray:
     return v_f
 
 
-def make_coriolis_rotation_hook(grid: Grid, cfg: CoriolisRotateConfig):
+def make_coriolis_rotation_hook(grid: Grid, cfg: CoriolisRotateConfig) -> PostHook:
     fC = _f_on_centers(grid, cfg.omega)  # (ny,)
     cap_rows = getattr(grid, "cap_rows", None)
 
@@ -95,10 +97,7 @@ def make_coriolis_rotation_hook(grid: Grid, cfg: CoriolisRotateConfig):
             MU_new = MU_new.copy(); MU_new[cap_rows, :] = state.MU[cap_rows, :]
         return State(M=state.M, T=state.T, qv=state.qv, qc=state.qc, qr=state.qr, MU=MU_new, MV=MV_new)
 
-    def hook(state: State, dt: float | None = None) -> State:
-        if dt is None:
-            return state
-        # unified: centers only
+    def hook(state: State, _t: float, dt: float, when: Literal["stage", "final"]) -> State:
         return rotate_centers(state, dt)
 
     return hook

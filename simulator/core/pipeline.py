@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, Literal
 
 import numpy as np
 
@@ -40,7 +40,7 @@ class RHSComposer:
 # ── Post-step hooks ─────────────────────────────────────────────────────────
 
 def make_positivity_clip(eps_q: float = 0.0, eps_M_rel: float = 1e-12) -> PostHook:
-    def _clip(s: State, _dt: float) -> State:
+    def _clip(s: State, _t: float, _dt: float, _when: Literal["stage", "final"]) -> State:
         out = s.copy()
         out.qv = np.maximum(out.qv, eps_q)
         out.qc = np.maximum(out.qc, eps_q)
@@ -55,7 +55,7 @@ def make_cap_projection(grid: Grid) -> PostHook:
     # Precompute weights once
     A = cell_areas(grid)
     W = build_cap_row_weights(grid, A)
-    def _cap(s: State, _dt: float) -> State:
+    def _cap(s: State, _t: float, _dt: float, _when: Literal["stage", "final"]) -> State:
         out = s.copy()
         out.M  = enforce_cap_mean(out.M,  grid, W)
         out.T  = enforce_cap_mean(out.T,  grid, W)

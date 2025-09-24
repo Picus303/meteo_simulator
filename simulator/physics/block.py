@@ -53,7 +53,6 @@ def physics_step_strang(state: State, grid: Grid, t_sec: float, dt: float,
     """Advance physics by one full dt using Strang splitting.
     Returns (new_state, updated_diag). orb_spin is (orb, spin) for radiation.
     """
-    from .orbit import KeplerOrbit, SpinConfig  # lazy import to avoid cycles
     orb, spin = orb_spin
 
     if diag is None:
